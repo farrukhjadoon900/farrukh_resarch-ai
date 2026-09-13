@@ -1,9 +1,19 @@
 import os
-from crewai import Agent, Task, Crew, Process
+from crewai import Agent, Task, Crew, Process, LLM
 
-# Topic GitHub Actions se aayega
-topic = os.environ.get('TOPIC', 'default topic')
-print(f"Researching: {topic}")
+# Topic aur Model environment variables se aayenge
+topic = os.getenv('TOPIC', 'default topic')
+model_name = os.getenv('MODEL', 'gemini/gemini-2.0-flash')
+api_key = os.getenv('GOOGLE_API_KEY')
+
+print(f"Researching topic: {topic}")
+print(f"Using model: {model_name}")
+
+# LLM setup for Gemini
+llm_model = LLM(
+    model=model_name,
+    api_key=api_key
+)
 
 # Manager Agent
 manager = Agent(
@@ -11,6 +21,7 @@ manager = Agent(
     goal="Manage research tasks and ensure quality output",
     backstory="You are an experienced manager who delegates and validates work.",
     allow_delegation=True,
+    llm=llm_model,
 )
 
 # Researcher Agent
@@ -19,7 +30,7 @@ researcher = Agent(
     goal="Find accurate information on the given topic",
     backstory="You are a meticulous researcher who cites sources.",
     allow_delegation=False,
-    llm="gemini/gemini-2.0-flash",
+    llm=llm_model,
 )
 
 # Writer Agent
@@ -28,7 +39,7 @@ writer = Agent(
     goal="Create clear reports from research",
     backstory="You turn complex research into readable summaries.",
     allow_delegation=False,
-    llm="gemini/gemini-2.0-flash",
+    llm=llm_model,
 )
 
 # Tasks
@@ -49,10 +60,12 @@ crew = Crew(
     agents=[researcher, writer],
     tasks=[research_task, write_task],
     process=Process.hierarchical,
-    manager_llm="gemini/gemini-2.0-flash",
+    manager_agent=manager,
+    manager_llm=llm_model,
     verbose=True,
 )
 
+# Start Crew Process
 result = crew.kickoff()
 
 # Result save karein
