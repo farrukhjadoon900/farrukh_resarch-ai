@@ -1,1 +1,2 @@
-# farrukh_resarch-ai
+# farrukh_resarch-ai 
+my api - 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
