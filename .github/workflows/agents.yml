@@ -1,4 +1,4 @@
-Name: Run Multi-Agent System
+name: Run Multi-Agent System
 
 on:
   workflow_dispatch:
