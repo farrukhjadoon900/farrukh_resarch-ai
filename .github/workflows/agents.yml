@@ -18,7 +18,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip' # Packages ko cache karega taake workflow fast chalay
+          cache: 'pip'
       
       - name: Upgrade pip and setuptools
         run: |
@@ -30,13 +30,14 @@ jobs:
       
       - name: Run CrewAI
         env:
-          GOOGLE_API_KEY: ${{ secrets.google_api_key }} # Small letters secret name match kar diya hai
+          GOOGLE_API_KEY: ${{ secrets.google_api_key }}
           TOPIC: ${{ github.event.inputs.topic }}
+          MODEL: "gemini/gemini-1.5-flash" # Yahan model name set kar diya hai
         run: python main.py
       
       - name: Upload Result
         uses: actions/upload-artifact@v4
-        if: always() # Agar workflow fail bhi ho tab bhi file upload karne ki koshish karega
+        if: always()
         with:
           name: research-output
           path: output.md
