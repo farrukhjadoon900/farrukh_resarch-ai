@@ -1,4 +1,4 @@
-name: Run Multi-Agent System
+Name: Run Multi-Agent System
 
 on:
   workflow_dispatch:
@@ -18,18 +18,25 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip' # Packages ko cache karega taake workflow fast chalay
+      
+      - name: Upgrade pip and setuptools
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
       
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
       
       - name: Run CrewAI
         env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.google_api_key }} # Small letters secret name match kar diya hai
           TOPIC: ${{ github.event.inputs.topic }}
         run: python main.py
       
       - name: Upload Result
         uses: actions/upload-artifact@v4
+        if: always() # Agar workflow fail bhi ho tab bhi file upload karne ki koshish karega
         with:
           name: research-output
           path: output.md
