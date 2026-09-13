@@ -1,0 +1,29 @@
+name: Run Multi-Agent System
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Research topic'
+        required: true
+        type: string
+
+jobs:
+  run-agents:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: pip install crewai crewai-tools
+      
+      - name: Run CrewAI
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TOPIC: ${{ github.event.inputs.topic }}
+        run: python main.py
