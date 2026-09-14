@@ -16,7 +16,20 @@ API_KEY = (
     or ""
 )
 
-MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+# Preferred order — first one that actually works gets used.
+# If Groq deprecates one, it just falls through to the next.
+MODEL_PREFERENCE = [
+    os.getenv("GROQ_MODEL"),  # explicit override, if set
+    "llama-3.1-8b-instant",
+    "openai/gpt-oss-120b",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "qwen/qwen3-32b",
+    "openai/gpt-oss-20b",
+]
+MODEL_PREFERENCE = [m for m in MODEL_PREFERENCE if m]  # drop empty/None
+
+MODEL = MODEL_PREFERENCE[0]
+
 BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 TEMPERATURE = float(os.getenv("JARVIS_TEMPERATURE", "0.3"))
 MAX_ITER = int(os.getenv("JARVIS_MAX_ITER", "12"))
