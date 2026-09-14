@@ -16,7 +16,7 @@ API_KEY = (
     or ""
 )
 
-MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+MODEL = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
 BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 TEMPERATURE = float(os.getenv("JARVIS_TEMPERATURE", "0.3"))
 MAX_ITER = int(os.getenv("JARVIS_MAX_ITER", "12"))
