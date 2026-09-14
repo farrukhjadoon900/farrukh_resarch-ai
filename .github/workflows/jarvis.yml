@@ -24,7 +24,7 @@ jobs:
   run:
     if: >
       github.event_name == 'workflow_dispatch' ||
-      contains(github.event.comment.body, '/jarvis')
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/jarvis'))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +46,11 @@ jobs:
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
           else
             BODY="${{ github.event.comment.body }}"
-            TEXT=$(echo "$BODY" | sed -n 's/.*\/jarvis[[:space:]]*//p' | head -1)
+            # Extract text after /jarvis line or fallback
+            TEXT=$(echo "$BODY" | grep -i '/jarvis' | sed 's/.*\/jarvis[[:space:]]*//' | head -n 1)
+            if [ -z "$TEXT" ]; then
+              TEXT="Hello Jarvis"
+            fi
             echo "text=$TEXT" >> "$GITHUB_OUTPUT"
             echo "mode=auto" >> "$GITHUB_OUTPUT"
           fi
@@ -79,19 +83,28 @@ jobs:
             const fs = require('fs');
             let body = '**Jarvis** finished.\n\n';
             try {
-              body += fs.readFileSync('/tmp/jarvis_out.md', 'utf8').slice(0, 60000);
+              if (fs.existsSync('/tmp/jarvis_out.md')) {
+                body += fs.readFileSync('/tmp/jarvis_out.md', 'utf8').slice(0, 65000);
+              } else {
+                body += '_No output generated._';
+              }
             } catch (e) {
-              body += '_No output captured._';
+              body += '_Error reading output file._';
             }
+            
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body
+              body: body
             });
 
       - name: Notify via ntfy
         if: always()
         run: |
-          MSG=$(head -c 200 /tmp/jarvis_out.md 2>/dev/null || echo "No output captured")
-          curl -s -d "$MSG" https://ntfy.sh/mfj-jarvis
+          if [ -f /tmp/jarvis_out.md ]; then
+            MSG=$(head -c 200 /tmp/jarvis_out.md)
+          else
+            MSG="Jarvis workflow execution completed."
+          fi
+          curl -s --data-binary "$MSG" https://ntfy.sh/mfj-jarvis
