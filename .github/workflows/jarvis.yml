@@ -1,1 +1,91 @@
+name: jarvis
 
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "Command for Jarvis"
+        required: true
+        type: string
+      mode:
+        description: "auto | learn | answer | research"
+        required: false
+        default: auto
+        type: string
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  run:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.comment.body, '/jarvis')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Resolve prompt
+        id: prompt
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "text=${{ inputs.prompt }}" >> "$GITHUB_OUTPUT"
+            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+          else
+            BODY="${{ github.event.comment.body }}"
+            TEXT=$(echo "$BODY" | sed -n 's/.*\/jarvis[[:space:]]*//p' | head -1)
+            echo "text=$TEXT" >> "$GITHUB_OUTPUT"
+            echo "mode=auto" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Jarvis
+        env:
+          groq_api_key: ${{ secrets.groq_api_key }}
+        run: |
+          export PYTHONPATH="${{ github.workspace }}/src"
+          python -m jarvis.cli ask "\( {{ steps.prompt.outputs.text }}" --mode " \){{ steps.prompt.outputs.mode }}" \
+            | tee /tmp/jarvis_out.md
+
+      - name: Commit new skills (if any)
+        run: |
+          git config user.name "jarvis-bot"
+          git config user.email "jarvis@users.noreply.github.com"
+          git add skills/ || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(skills): update from Jarvis run"
+            git push
+          else
+            echo "No skill changes"
+          fi
+
+      - name: Reply on issue (comment trigger)
+        if: github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '**Jarvis** finished.\n\n';
+            try {
+              body += fs.readFileSync('/tmp/jarvis_out.md', 'utf8').slice(0, 60000);
+            } catch (e) {
+              body += '_No output captured._';
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
