@@ -14,6 +14,16 @@ on:
         required: false
         default: auto
         type: string
+      ntfy_topics:
+        description: "Comma-separated ntfy topics (e.g. mfj-jarvis, mfj-alerts)"
+        required: false
+        default: "mfj-jarvis"
+        type: string
+
+# Automatic cancel for in-progress runs when new push occurs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -44,6 +54,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "text=${{ inputs.prompt }}" >> "$GITHUB_OUTPUT"
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
+            echo "ntfy_topics=${{ inputs.ntfy_topics }}" >> "$GITHUB_OUTPUT"
           else
             BODY="${{ github.event.comment.body }}"
             # Extract text after /jarvis line or fallback
@@ -53,11 +64,28 @@ jobs:
             fi
             echo "text=$TEXT" >> "$GITHUB_OUTPUT"
             echo "mode=auto" >> "$GITHUB_OUTPUT"
+            echo "ntfy_topics=mfj-jarvis" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Send Welcome Notification via ntfy
+        env:
+          NTFY_TOPICS: ${{ steps.prompt.outputs.ntfy_topics }}
+        run: |
+          WELCOME_MSG="Welcome farrukh apka ai system tyar hy."
+          IFS=',' read -ra TOPICS <<< "${NTFY_TOPICS:-mfj-jarvis}"
+          for TOPIC in "${TOPICS[@]}"; do
+            CLEAN_TOPIC=$(echo "$TOPIC" | xargs)
+            if [ -n "$CLEAN_TOPIC" ]; then
+              echo "Sending welcome notification to: $CLEAN_TOPIC"
+              curl -s --data-binary "$WELCOME_MSG" "https://ntfy.sh/$CLEAN_TOPIC"
+            fi
+          done
 
       - name: Run Jarvis
         env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           groq_api_key: ${{ secrets.groq_api_key }}
+          MODEL_NAME: "groq/llama3-8b-8192"
         run: |
           export PYTHONPATH="${{ github.workspace }}/src"
           python -m jarvis.cli ask "${{ steps.prompt.outputs.text }}" --mode "${{ steps.prompt.outputs.mode }}" \
@@ -99,12 +127,22 @@ jobs:
               body: body
             });
 
-      - name: Notify via ntfy
+      - name: Notify via ntfy (Completion)
         if: always()
+        env:
+          NTFY_TOPICS: ${{ steps.prompt.outputs.ntfy_topics }}
         run: |
           if [ -f /tmp/jarvis_out.md ]; then
             MSG=$(head -c 200 /tmp/jarvis_out.md)
           else
             MSG="Jarvis workflow execution completed."
           fi
-          curl -s --data-binary "$MSG" https://ntfy.sh/mfj-jarvis
+
+          IFS=',' read -ra TOPICS <<< "${NTFY_TOPICS:-mfj-jarvis}"
+          for TOPIC in "${TOPICS[@]}"; do
+            CLEAN_TOPIC=$(echo "$TOPIC" | xargs)
+            if [ -n "$CLEAN_TOPIC" ]; then
+              echo "Sending completion notification to: $CLEAN_TOPIC"
+              curl -s --data-binary "$MSG" "https://ntfy.sh/$CLEAN_TOPIC"
+            fi
+          done
