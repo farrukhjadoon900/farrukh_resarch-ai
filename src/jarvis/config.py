@@ -16,23 +16,20 @@ API_KEY = (
     or ""
 )
 
-# Preferred order — first one that actually works gets used.
-# If Groq deprecates one, it just falls through to the next.
-MODEL_PREFERENCE = [
-    os.getenv("GROQ_MODEL"),  # explicit override, if set
-    "llama-3.1-8b-instant",
-    "openai/gpt-oss-120b",
-    "meta-llama/llama-4-scout-17b-16e-instruct",
-    "qwen/qwen3-32b",
-    "openai/gpt-oss-20b",
-]
-MODEL_PREFERENCE = [m for m in MODEL_PREFERENCE if m]  # drop empty/None
-
-MODEL = os.getenv("MODEL_NAME", "GROQ_MODEL")
+_raw_model = (
+    os.getenv("GROQ_MODEL")
+    or os.getenv("MODEL_NAME")
+    or "llama-3.3-70b-versatile"
+)
+if _raw_model.startswith("groq/"):
+    _raw_model = _raw_model[len("groq/") :]
+if _raw_model in {"llama3-8b-8192", "llama-3.1-8b-8192"}:
+    _raw_model = "llama-3.1-8b-instant"
+MODEL = _raw_model
 
 BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 TEMPERATURE = float(os.getenv("JARVIS_TEMPERATURE", "0.3"))
-MAX_ITER = int(os.getenv("JARVIS_MAX_ITER", "12"))
+MAX_ITER = int(os.getenv("JARVIS_MAX_ITER", "8"))
 VERBOSE = os.getenv("JARVIS_VERBOSE", "true").lower() in {"1", "true", "yes"}
 
 SKILLS_DIR = ROOT / "skills"
@@ -46,8 +43,8 @@ for d in (SKILLS_DIR, MEMORY_DIR, LOGS_DIR):
 def require_api_key() -> str:
     if not API_KEY:
         raise RuntimeError(
-            "Missing API key. Set environment variable 'groq_api_key' "
-            "(GitHub Secrets) or put it in .env\n"
+            "Missing API key. Set GitHub secret 'groq_api_key' "
+            "or env GROQ_API_KEY / groq_api_key.\n"
             "Example: groq_api_key=gsk_xxxxxxxx"
         )
     return API_KEY
