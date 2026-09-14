@@ -1,0 +1,32 @@
+# Secrets
+.env
+.env.local
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+.envrc
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Runtime
+logs/*.log
+logs/*.json
+memory/*.db
+memory/*.sqlite
+memory/chroma/
+.cache/
+
+config.local.yaml
