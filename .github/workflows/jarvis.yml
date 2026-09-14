@@ -15,12 +15,11 @@ on:
         default: auto
         type: string
       ntfy_topics:
-        description: "Comma-separated ntfy topics (e.g. mfj-jarvis, mfj-alerts)"
+        description: "Comma-separated ntfy topics"
         required: false
-        default: "mfj-jarvis"
+        default: ""
         type: string
 
-# Automatic cancel for in-progress runs when new push occurs
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -48,16 +47,16 @@ jobs:
           python -m pip install -U pip
           pip install -r requirements.txt
 
-      - name: Resolve prompt
+      - name: Resolve Prompt & Env Variables
         id: prompt
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "text=${{ inputs.prompt }}" >> "$GITHUB_OUTPUT"
             echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-            echo "ntfy_topics=${{ inputs.ntfy_topics }}" >> "$GITHUB_OUTPUT"
+            NTFY_INPUT="${{ inputs.ntfy_topics }}"
+            echo "ntfy_topics=${NTFY_INPUT:-mfj-jarvis}" >> "$GITHUB_OUTPUT"
           else
             BODY="${{ github.event.comment.body }}"
-            # Extract text after /jarvis line or fallback
             TEXT=$(echo "$BODY" | grep -i '/jarvis' | sed 's/.*\/jarvis[[:space:]]*//' | head -n 1)
             if [ -z "$TEXT" ]; then
               TEXT="Hello Jarvis"
@@ -83,9 +82,10 @@ jobs:
 
       - name: Run Jarvis
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.groq_api_key }}
           groq_api_key: ${{ secrets.groq_api_key }}
-          MODEL_NAME: "groq/llama3-8b-8192"
+          MODEL_NAME: ${{ vars.MODEL_NAME || 'groq/llama3-8b-8192' }}
+          NTFY_TOPICS: ${{ steps.prompt.outputs.ntfy_topics }}
         run: |
           export PYTHONPATH="${{ github.workspace }}/src"
           python -m jarvis.cli ask "${{ steps.prompt.outputs.text }}" --mode "${{ steps.prompt.outputs.mode }}" \
