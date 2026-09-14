@@ -17,11 +17,11 @@ on:
       ntfy_topics:
         description: "Comma-separated ntfy topics"
         required: false
-        default: ""
+        default: "mfj-jarvis"
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: jarvis-\( {{ github.repository }}- \){{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -33,78 +33,126 @@ jobs:
   run:
     if: >
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/jarvis'))
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '/jarvis'))
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 45
 
-      - uses: actions/setup-python@v5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
-      - name: Install
+      - name: Install dependencies
         run: |
           python -m pip install -U pip
           pip install -r requirements.txt
 
-      - name: Resolve Prompt & Env Variables
+      - name: Resolve prompt
         id: prompt
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_PROMPT: ${{ inputs.prompt }}
+          DISPATCH_MODE: ${{ inputs.mode }}
+          DISPATCH_NTFY: ${{ inputs.ntfy_topics }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "text=${{ inputs.prompt }}" >> "$GITHUB_OUTPUT"
-            echo "mode=${{ inputs.mode }}" >> "$GITHUB_OUTPUT"
-            NTFY_INPUT="${{ inputs.ntfy_topics }}"
-            echo "ntfy_topics=${NTFY_INPUT:-mfj-jarvis}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            TEXT="${DISPATCH_PROMPT}"
+            MODE="${DISPATCH_MODE:-auto}"
+            NTFY="${DISPATCH_NTFY:-mfj-jarvis}"
           else
-            BODY="${{ github.event.comment.body }}"
-            TEXT=$(echo "$BODY" | grep -i '/jarvis' | sed 's/.*\/jarvis[[:space:]]*//' | head -n 1)
+            TEXT=$(printf '%s\n' "$COMMENT_BODY" | sed -n 's/.*\/jarvis[[:space:]]*//ip' | head -n 1)
+            TEXT=$(printf '%s' "\( TEXT" | sed 's/\r \)//')
             if [ -z "$TEXT" ]; then
               TEXT="Hello Jarvis"
             fi
-            echo "text=$TEXT" >> "$GITHUB_OUTPUT"
-            echo "mode=auto" >> "$GITHUB_OUTPUT"
-            echo "ntfy_topics=mfj-jarvis" >> "$GITHUB_OUTPUT"
+            MODE="auto"
+            NTFY="mfj-jarvis"
           fi
+          {
+            echo "mode=$MODE"
+            echo "ntfy_topics=$NTFY"
+          } >> "$GITHUB_OUTPUT"
+          PROMPT_FILE="$RUNNER_TEMP/jarvis_prompt.txt"
+          printf '%s' "$TEXT" > "$PROMPT_FILE"
+          echo "prompt_file=$PROMPT_FILE" >> "$GITHUB_OUTPUT"
+          echo "Resolved prompt (first 200 chars):"
+          head -c 200 "$PROMPT_FILE" || true
+          echo
 
-      - name: Send Welcome Notification via ntfy
+      - name: Check API key secret
+        env:
+          KEY: ${{ secrets.groq_api_key }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::Secret 'groq_api_key' is empty or missing. Add it in Repo Settings → Secrets."
+            exit 1
+          fi
+          echo "Secret groq_api_key is set (length ${#KEY})."
+
+      - name: Welcome ntfy (optional)
+        continue-on-error: true
         env:
           NTFY_TOPICS: ${{ steps.prompt.outputs.ntfy_topics }}
         run: |
-          WELCOME_MSG="Welcome farrukh apka ai system tyar hy."
+          MSG="Jarvis start — farrukh system chal raha hai."
           IFS=',' read -ra TOPICS <<< "${NTFY_TOPICS:-mfj-jarvis}"
           for TOPIC in "${TOPICS[@]}"; do
-            CLEAN_TOPIC=$(echo "$TOPIC" | xargs)
-            if [ -n "$CLEAN_TOPIC" ]; then
-              echo "Sending welcome notification to: $CLEAN_TOPIC"
-              curl -s --data-binary "$WELCOME_MSG" "https://ntfy.sh/$CLEAN_TOPIC"
-            fi
+            CLEAN=$(echo "$TOPIC" | xargs)
+            [ -n "$CLEAN" ] && curl -sS --max-time 10 -d "$MSG" "https://ntfy.sh/$CLEAN" || true
           done
 
       - name: Run Jarvis
+        id: jarvis
         env:
-          GROQ_API_KEY: ${{ secrets.groq_api_key }}
           groq_api_key: ${{ secrets.groq_api_key }}
-          MODEL_NAME: ${{ vars.MODEL_NAME || 'groq/llama3-8b-8192' }}
-          NTFY_TOPICS: ${{ steps.prompt.outputs.ntfy_topics }}
+          GROQ_API_KEY: ${{ secrets.groq_api_key }}
+          GROQ_MODEL: ${{ vars.GROQ_MODEL || 'llama-3.3-70b-versatile' }}
+          GROQ_BASE_URL: https://api.groq.com/openai/v1
+          JARVIS_VERBOSE: "true"
+          JARVIS_MAX_ITER: "8"
+          PYTHONPATH: ${{ github.workspace }}/src
+          PYTHONUNBUFFERED: "1"
         run: |
-          export PYTHONPATH="${{ github.workspace }}/src"
-          python -m jarvis.cli ask "${{ steps.prompt.outputs.text }}" --mode "${{ steps.prompt.outputs.mode }}" \
-            | tee /tmp/jarvis_out.md
+          set -euo pipefail
+          PROMPT_FILE="${{ steps.prompt.outputs.prompt_file }}"
+          MODE="${{ steps.prompt.outputs.mode }}"
+          PROMPT=$(cat "$PROMPT_FILE")
+          echo "Model=$GROQ_MODEL mode=$MODE"
+          echo "Workspace files:" && ls -la && ls -la src/jarvis || true
+
+          python -m jarvis.cli ask "$PROMPT" --mode "$MODE" 2>&1 | tee /tmp/jarvis_out.md
+          echo "Jarvis exit ok. Output bytes: $(wc -c < /tmp/jarvis_out.md)"
 
       - name: Commit new skills (if any)
+        continue-on-error: true
         run: |
+          set -euo pipefail
           git config user.name "jarvis-bot"
-          git config user.email "jarvis@users.noreply.github.com"
+          git config user.email "jarvis-bot@users.noreply.github.com"
           git add skills/ || true
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(skills): update from Jarvis run"
-            git push
-          else
+          if git diff --cached --quiet; then
             echo "No skill changes"
+          else
+            git status
+            git commit -m "chore(skills): update from Jarvis run [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+            echo "Skills committed and pushed"
           fi
 
-      - name: Reply on issue (comment trigger)
+      - name: Reply on issue
         if: github.event_name == 'issue_comment'
+        continue-on-error: true
         uses: actions/github-script@v7
         with:
           script: |
@@ -112,37 +160,35 @@ jobs:
             let body = '**Jarvis** finished.\n\n';
             try {
               if (fs.existsSync('/tmp/jarvis_out.md')) {
-                body += fs.readFileSync('/tmp/jarvis_out.md', 'utf8').slice(0, 65000);
+                let text = fs.readFileSync('/tmp/jarvis_out.md', 'utf8');
+                if (text.length > 60000) text = text.slice(0, 60000) + '\n\n_(truncated)_';
+                body += text;
               } else {
-                body += '_No output generated._';
+                body += '_No output file._';
               }
             } catch (e) {
-              body += '_Error reading output file._';
+              body += '_Error reading output: ' + e.message + '_';
             }
-            
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: body
+              body
             });
 
-      - name: Notify via ntfy (Completion)
+      - name: Completion ntfy (optional)
         if: always()
+        continue-on-error: true
         env:
           NTFY_TOPICS: ${{ steps.prompt.outputs.ntfy_topics }}
         run: |
           if [ -f /tmp/jarvis_out.md ]; then
-            MSG=$(head -c 200 /tmp/jarvis_out.md)
+            MSG=$(head -c 180 /tmp/jarvis_out.md | tr '\n' ' ')
           else
-            MSG="Jarvis workflow execution completed."
+            MSG="Jarvis workflow finished (no output file)."
           fi
-
           IFS=',' read -ra TOPICS <<< "${NTFY_TOPICS:-mfj-jarvis}"
           for TOPIC in "${TOPICS[@]}"; do
-            CLEAN_TOPIC=$(echo "$TOPIC" | xargs)
-            if [ -n "$CLEAN_TOPIC" ]; then
-              echo "Sending completion notification to: $CLEAN_TOPIC"
-              curl -s --data-binary "$MSG" "https://ntfy.sh/$CLEAN_TOPIC"
-            fi
+            CLEAN=$(echo "$TOPIC" | xargs)
+            [ -n "$CLEAN" ] && curl -sS --max-time 10 -d "$MSG" "https://ntfy.sh/$CLEAN" || true
           done
