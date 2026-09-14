@@ -28,7 +28,7 @@ MODEL_PREFERENCE = [
 ]
 MODEL_PREFERENCE = [m for m in MODEL_PREFERENCE if m]  # drop empty/None
 
-MODEL = os.getenv("MODEL_NAME", "model")
+MODEL = os.getenv("MODEL_NAME", "GROQ_MODEL")
 
 BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 TEMPERATURE = float(os.getenv("JARVIS_TEMPERATURE", "0.3"))
