@@ -95,17 +95,17 @@ jobs:
           KEY: ${{ secrets.groq_api_key }}
         run: |
           if [ -z "$KEY" ]; then
-            echo "::error::Secret 'groq_api_key' is empty or missing. Add it in Repo Settings → Secrets."
+            echo "::error::Secret 'groq_api_key' missing. Repo Settings → Secrets → groq_api_key"
             exit 1
           fi
-          echo "Secret groq_api_key is set (length ${#KEY})."
+          echo "Secret groq_api_key OK (length ${#KEY})."
 
       - name: Welcome ntfy (optional)
         continue-on-error: true
         env:
           NTFY_TOPICS: ${{ steps.prompt.outputs.ntfy_topics }}
         run: |
-          MSG="Jarvis start — farrukh system chal raha hai."
+          MSG="Jarvis start — system chal raha hai."
           IFS=',' read -ra TOPICS <<< "${NTFY_TOPICS:-mfj-jarvis}"
           for TOPIC in "${TOPICS[@]}"; do
             CLEAN=$(echo "$TOPIC" | xargs)
@@ -116,8 +116,8 @@ jobs:
         id: jarvis
         env:
           groq_api_key: ${{ secrets.groq_api_key }}
-        
-          GROQ_MODEL: ${{ vars.GROQ_MODEL || 'llama-3.3-70b-versatile' }}
+          
+          GROQ_MODEL: ${{ vars.GROQ_MODEL || 'openai/gpt-oss-120b' }}
           GROQ_BASE_URL: https://api.groq.com/openai/v1
           JARVIS_VERBOSE: "true"
           JARVIS_MAX_ITER: "8"
@@ -128,11 +128,11 @@ jobs:
           PROMPT_FILE="${{ steps.prompt.outputs.prompt_file }}"
           MODE="${{ steps.prompt.outputs.mode }}"
           PROMPT=$(cat "$PROMPT_FILE")
-          echo "Model=$GROQ_MODEL mode=$MODE"
-          echo "Workspace files:" && ls -la && ls -la src/jarvis || true
+          echo "Using GROQ_MODEL=$GROQ_MODEL"
+          echo "Workspace:" && ls -la && ls -la src/jarvis || true
 
           python -m jarvis.cli ask "$PROMPT" --mode "$MODE" 2>&1 | tee /tmp/jarvis_out.md
-          echo "Jarvis exit ok. Output bytes: $(wc -c < /tmp/jarvis_out.md)"
+          echo "Jarvis OK. Output bytes: $(wc -c < /tmp/jarvis_out.md)"
 
       - name: Commit new skills (if any)
         continue-on-error: true
@@ -147,7 +147,7 @@ jobs:
             git status
             git commit -m "chore(skills): update from Jarvis run [skip ci]"
             git push origin HEAD:${{ github.ref_name }}
-            echo "Skills committed and pushed"
+            echo "Skills pushed"
           fi
 
       - name: Reply on issue
@@ -167,7 +167,7 @@ jobs:
                 body += '_No output file._';
               }
             } catch (e) {
-              body += '_Error reading output: ' + e.message + '_';
+              body += '_Error: ' + e.message + '_';
             }
             await github.rest.issues.createComment({
               owner: context.repo.owner,
@@ -185,10 +185,11 @@ jobs:
           if [ -f /tmp/jarvis_out.md ]; then
             MSG=$(head -c 180 /tmp/jarvis_out.md | tr '\n' ' ')
           else
-            MSG="Jarvis workflow finished (no output file)."
+            MSG="Jarvis workflow finished."
           fi
           IFS=',' read -ra TOPICS <<< "${NTFY_TOPICS:-mfj-jarvis}"
           for TOPIC in "${TOPICS[@]}"; do
             CLEAN=$(echo "$TOPIC" | xargs)
             [ -n "$CLEAN" ] && curl -sS --max-time 10 -d "$MSG" "https://ntfy.sh/$CLEAN" || true
           done
+  
