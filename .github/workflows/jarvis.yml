@@ -56,7 +56,7 @@ jobs:
           groq_api_key: ${{ secrets.groq_api_key }}
         run: |
           export PYTHONPATH="${{ github.workspace }}/src"
-          python -m jarvis.cli ask "\( {{ steps.prompt.outputs.text }}" --mode " \){{ steps.prompt.outputs.mode }}" \
+          python -m jarvis.cli ask "${{ steps.prompt.outputs.text }}" --mode "${{ steps.prompt.outputs.mode }}" \
             | tee /tmp/jarvis_out.md
 
       - name: Commit new skills (if any)
@@ -89,3 +89,9 @@ jobs:
               issue_number: context.issue.number,
               body
             });
+
+      - name: Notify via ntfy
+        if: always()
+        run: |
+          MSG=$(head -c 200 /tmp/jarvis_out.md 2>/dev/null || echo "No output captured")
+          curl -s -d "$MSG" https://ntfy.sh/mfj-jarvis
