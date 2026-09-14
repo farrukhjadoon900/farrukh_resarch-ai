@@ -4,12 +4,18 @@ Jarvis crew — command router + research + skill learning + expert answer.
 
 from __future__ import annotations
 
+import os
 from crewai import Agent, Crew, Process, Task
 from crewai_tools import DirectoryReadTool, FileReadTool, FileWriterTool
 
 from jarvis.config import MAX_ITER, SKILLS_DIR, VERBOSE
 from jarvis.llm import get_llm
-from jarvis.tools import list_skills, read_skill, write_skill, append_skill_reference
+from jarvis.tools import (
+    append_skill_reference,
+    list_skills,
+    read_skill,
+    write_skill,
+)
 
 try:
     from crewai_tools import SerperDevTool
@@ -20,13 +26,22 @@ except Exception:
     SEARCH_TOOLS = []
 
 
+def _get_skills_dir_path() -> str:
+    """Safely return skills directory path as string, creating it if needed."""
+    skills_path = str(SKILLS_DIR)
+    if not os.path.exists(skills_path):
+        os.makedirs(skills_path, exist_ok=True)
+    return skills_path
+
+
 def _common_tools():
+    skills_path = _get_skills_dir_path()
     tools = [
         list_skills,
         read_skill,
         write_skill,
         append_skill_reference,
-        DirectoryReadTool(directory=str(SKILLS_DIR)),
+        DirectoryReadTool(directory=skills_path),
         FileReadTool(),
         FileWriterTool(),
     ]
@@ -36,6 +51,7 @@ def _common_tools():
 
 def build_agents():
     llm = get_llm()
+    skills_path = _get_skills_dir_path()
 
     router = Agent(
         role="Jarvis Command Router",
@@ -106,8 +122,7 @@ def build_agents():
             "and practical. You sound like a trusted senior advisor, not a chatbot."
         ),
         llm=llm,
-        tools=[list_skills, read_skill, DirectoryReadTool(directory=str(SKILLS_DIR))],
-        skills=[str(SKILLS_DIR)] if SKILLS_DIR.exists() else [],
+        tools=[list_skills, read_skill, DirectoryReadTool(directory=skills_path)],
         verbose=VERBOSE,
         max_iter=MAX_ITER,
         allow_delegation=False,
