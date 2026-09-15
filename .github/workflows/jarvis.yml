@@ -21,7 +21,7 @@ on:
         type: string
 
 concurrency:
-  group: jarvis-\( {{ github.repository }}- \){{ github.ref }}
+  group: jarvis-{{ github.repository }}-{{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -71,8 +71,8 @@ jobs:
             MODE="${DISPATCH_MODE:-auto}"
             NTFY="${DISPATCH_NTFY:-mfj-jarvis}"
           else
-            TEXT=$(printf '%s\n' "$COMMENT_BODY" | sed -n 's/.*\/jarvis[[:space:]]*//ip' | head -n 1)
-            TEXT=$(printf '%s' "\( TEXT" | sed 's/\r \)//')
+            TEXT=$(printf '%$' "$COMMENT_BODY" | sed -n 's/.*/jarvis[[:space:]]*//ip' | head -n 1)
+            TEXT=$(printf '%s' "$TEXT" | sed 's///')
             if [ -z "$TEXT" ]; then
               TEXT="Hello Jarvis"
             fi
@@ -95,10 +95,10 @@ jobs:
           KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           if [ -z "$KEY" ]; then
-            echo "::error::Secret 'GOOGLE_API_KEY' missing. Repo Settings → Secrets → groq_api_key"
+            echo "::error::Secret 'GOOGLE_API_KEY' missing. Repo Settings → Secrets → Actions → New repository secret"
             exit 1
           fi
-          echo "Secret google_api_key OK (length ${#KEY})."
+          echo "Secret GOOGLE_API_KEY OK (length ${#KEY})."
 
       - name: Welcome ntfy (optional)
         continue-on-error: true
@@ -115,12 +115,13 @@ jobs:
       - name: Run Jarvis
         id: jarvis
         env:
-          groq_api_key: ${{ secrets.GOOGLE_API_KEY}}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
           
-          GROQ_MODEL: ${{ vars.MY_MODEL || 'openai/gpt-oss-120b' }}
-          GROQ_BASE_URL: vars.BASE_URL
+          MY_MODEL: ${{ vars.MY_MODEL || 'gemini-flash-latest' }}
+          BASE_URL: ${{ vars.BASE_URL || 'https://generativelanguage.googleapis.com/v1beta' }}
           JARVIS_VERBOSE: "true"
           JARVIS_MAX_ITER: "8"
+          JARVIS_TEMPERATURE: "0.3"
           PYTHONPATH: ${{ github.workspace }}/src
           PYTHONUNBUFFERED: "1"
         run: |
@@ -128,7 +129,8 @@ jobs:
           PROMPT_FILE="${{ steps.prompt.outputs.prompt_file }}"
           MODE="${{ steps.prompt.outputs.mode }}"
           PROMPT=$(cat "$PROMPT_FILE")
-          echo "Using GROQ_MODEL=$GROQ_MODEL"
+          echo "Using MY_MODEL=$MY_MODEL"
+          echo "Using BASE_URL=$BASE_URL"
           echo "Workspace:" && ls -la && ls -la src/jarvis || true
 
           python -m jarvis.cli ask "$PROMPT" --mode "$MODE" 2>&1 | tee /tmp/jarvis_out.md
@@ -157,11 +159,15 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            let body = '**Jarvis** finished.\n\n';
+            let body = '**Jarvis** finished.
+
+';
             try {
               if (fs.existsSync('/tmp/jarvis_out.md')) {
                 let text = fs.readFileSync('/tmp/jarvis_out.md', 'utf8');
-                if (text.length > 60000) text = text.slice(0, 60000) + '\n\n_(truncated)_';
+                if (text.length > 60000) text = text.slice(0, 60000) + '
+
+_(truncated)_';
                 body += text;
               } else {
                 body += '_No output file._';
@@ -183,7 +189,8 @@ jobs:
           NTFY_TOPICS: ${{ steps.prompt.outputs.ntfy_topics }}
         run: |
           if [ -f /tmp/jarvis_out.md ]; then
-            MSG=$(head -c 180 /tmp/jarvis_out.md | tr '\n' ' ')
+            MSG=$(head -c 180 /tmp/jarvis_out.md | tr '
+' ' ')
           else
             MSG="Jarvis workflow finished."
           fi
@@ -192,4 +199,3 @@ jobs:
             CLEAN=$(echo "$TOPIC" | xargs)
             [ -n "$CLEAN" ] && curl -sS --max-time 10 -d "$MSG" "https://ntfy.sh/$CLEAN" || true
           done
-  
