@@ -15,12 +15,6 @@ from dotenv import load_dotenv
 
 ROOT = Path(**file**).resolve().parents[2]
 
-# Load local .env if available.
-
-# GitHub Actions environment variables are already
-
-# injected into the process and will be used directly.
-
 load_dotenv(ROOT / ".env")
 
 # ─────────────────────────────────────────────
@@ -112,7 +106,7 @@ if not API_KEY:
     raise RuntimeError(
         "Missing API key. Set GitHub secret "
         "'GOOGLE_API_KEY' or environment variable "
-        'GOOGLE_API_KEY.\n'
+        "GOOGLE_API_KEY.\n"
         "Example: GOOGLE_API_KEY=AIzaSyxxxxxxxx"
     )
 
