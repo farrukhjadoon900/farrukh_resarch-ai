@@ -1,5 +1,3 @@
-"""Jarvis configuration — GitHub Actions / Google API compatible."""
-
 from __future__ import annotations
 
 import os
