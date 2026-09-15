@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-import https
+
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
