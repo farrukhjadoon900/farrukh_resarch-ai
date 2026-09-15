@@ -52,23 +52,24 @@ or "https://generativelanguage.googleapis.com/v1beta"
 # ─────────────────────────────────────────────
 
 try:
-TEMPERATURE = float(
-os.getenv("JARVIS_TEMPERATURE", "0.3")
-)
+    TEMPERATURE = float(
+        os.getenv("JARVIS_TEMPERATURE", "0.3")
+    )
 except (TypeError, ValueError):
-TEMPERATURE = 0.3
+    TEMPERATURE = 0.3
 
 try:
-MAX_ITER = int(
-os.getenv("JARVIS_MAX_ITER", "8")
-)
+    MAX_ITER = int(
+        os.getenv("JARVIS_MAX_ITER", "8")
+    )
 except (TypeError, ValueError):
-MAX_ITER = 8
+    MAX_ITER = 8
 
 VERBOSE = (
-os.getenv("JARVIS_VERBOSE", "true").strip().lower()
-in {"1", "true", "yes", "on"}
+    os.getenv("JARVIS_VERBOSE", "true").strip().lower()
+    in {"1", "true", "yes", "on"}
 )
+
 
 # ─────────────────────────────────────────────
 
