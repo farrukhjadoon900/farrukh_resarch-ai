@@ -21,7 +21,7 @@ on:
         type: string
 
 concurrency:
-  group: jarvis-{{ github.repository }}-{{ github.ref }}
+  group: jarvis-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -71,7 +71,7 @@ jobs:
             MODE="${DISPATCH_MODE:-auto}"
             NTFY="${DISPATCH_NTFY:-mfj-jarvis}"
           else
-            TEXT=$(printf '%$' "$COMMENT_BODY" | sed -n 's/.*/jarvis[[:space:]]*//ip' | head -n 1)
+            TEXT=$(printf '%s' "$COMMENT_BODY" | sed -n 's/.*/jarvis[[:space:]]*//ip' | head -n 1)
             TEXT=$(printf '%s' "$TEXT" | sed 's///')
             if [ -z "$TEXT" ]; then
               TEXT="Hello Jarvis"
@@ -116,7 +116,6 @@ jobs:
         id: jarvis
         env:
           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          
           MY_MODEL: ${{ vars.MY_MODEL || 'gemini-flash-latest' }}
           BASE_URL: ${{ vars.BASE_URL || 'https://generativelanguage.googleapis.com/v1beta' }}
           JARVIS_VERBOSE: "true"
@@ -132,7 +131,6 @@ jobs:
           echo "Using MY_MODEL=$MY_MODEL"
           echo "Using BASE_URL=$BASE_URL"
           echo "Workspace:" && ls -la && ls -la src/jarvis || true
-
           python -m jarvis.cli ask "$PROMPT" --mode "$MODE" 2>&1 | tee /tmp/jarvis_out.md
           echo "Jarvis OK. Output bytes: $(wc -c < /tmp/jarvis_out.md)"
 
