@@ -1,50 +1,126 @@
-"""Configuration — reads groq_api_key and optional overrides from env."""
+"""Jarvis configuration — reads Google API key and runtime overrides from environment."""
 
-from __future__ import annotations
+from **future** import annotations
 
 import os
 from pathlib import Path
 
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parents[2]
+# ─────────────────────────────────────────────
+
+# PROJECT ROOT
+
+# ─────────────────────────────────────────────
+
+ROOT = Path(**file**).resolve().parents[2]
+
+# Load local .env if available.
+
+# GitHub Actions environment variables override these values.
+
 load_dotenv(ROOT / ".env")
 
+# ─────────────────────────────────────────────
+
+# API KEY
+
+# ─────────────────────────────────────────────
+
 API_KEY = (
-    os.getenv("groq_api_key")
-    or os.getenv("GROQ_API_KEY")
-    or ""
+os.getenv("GOOGLE_API_KEY")
+or ""
 )
 
-_raw_model = (
-    os.getenv("GROQ_MODEL")
-    or os.getenv("MODEL_NAME")
-    or "llama-3.3-70b-versatile"
-)
-if _raw_model.startswith("groq/"):
-    _raw_model = _raw_model[len("groq/") :]
-if _raw_model in {"llama3-8b-8192", "llama-3.1-8b-8192"}:
-    _raw_model = "llama-3.1-8b-instant"
-MODEL = _raw_model
+# ─────────────────────────────────────────────
 
-BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
-TEMPERATURE = float(os.getenv("JARVIS_TEMPERATURE", "0.3"))
-MAX_ITER = int(os.getenv("JARVIS_MAX_ITER", "8"))
-VERBOSE = os.getenv("JARVIS_VERBOSE", "true").lower() in {"1", "true", "yes"}
+# MODEL
+
+# ─────────────────────────────────────────────
+
+MODEL = (
+os.getenv("MY_MODEL")
+or "gemini-flash-latest"
+)
+
+# ─────────────────────────────────────────────
+
+# BASE URL
+
+# ─────────────────────────────────────────────
+
+BASE_URL = (
+os.getenv("BASE_URL")
+or "https://generativelanguage.googleapis.com/v1beta"
+)
+
+# ─────────────────────────────────────────────
+
+# JARVIS SETTINGS
+
+# ─────────────────────────────────────────────
+
+try:
+TEMPERATURE = float(
+os.getenv("JARVIS_TEMPERATURE", "0.3")
+)
+except ValueError:
+TEMPERATURE = 0.3
+
+try:
+MAX_ITER = int(
+os.getenv("JARVIS_MAX_ITER", "8")
+)
+except ValueError:
+MAX_ITER = 8
+
+VERBOSE = (
+os.getenv("JARVIS_VERBOSE", "true").lower()
+in {"1", "true", "yes", "on"}
+)
+
+# ─────────────────────────────────────────────
+
+# DIRECTORIES
+
+# ─────────────────────────────────────────────
 
 SKILLS_DIR = ROOT / "skills"
 MEMORY_DIR = ROOT / "memory"
 LOGS_DIR = ROOT / "logs"
 
-for d in (SKILLS_DIR, MEMORY_DIR, LOGS_DIR):
-    d.mkdir(parents=True, exist_ok=True)
+for directory in (
+SKILLS_DIR,
+MEMORY_DIR,
+LOGS_DIR,
+):
+directory.mkdir(
+parents=True,
+exist_ok=True,
+)
 
+# ─────────────────────────────────────────────
+
+# API KEY VALIDATION
+
+# ─────────────────────────────────────────────
 
 def require_api_key() -> str:
-    if not API_KEY:
-        raise RuntimeError(
-            "Missing API key. Set GitHub secret 'groq_api_key' "
-            "or env GROQ_API_KEY / groq_api_key.\n"
-            "Example: groq_api_key=gsk_xxxxxxxx"
-        )
-    return API_KEY
+"""
+Return the configured Google API key.
+
+```
+The key is expected from the GitHub Actions
+secret GOOGLE_API_KEY or local .env.
+"""
+
+if not API_KEY:
+    raise RuntimeError(
+        "Missing API key.\n\n"
+        "Set GitHub Actions secret 'GOOGLE_API_KEY' "
+        "or define GOOGLE_API_KEY in .env.\n"
+        "Example: GOOGLE_API_KEY=AIzaSy..."
+    )
+
+return API_KEY
+
