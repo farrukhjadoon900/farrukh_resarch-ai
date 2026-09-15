@@ -92,13 +92,13 @@ jobs:
 
       - name: Check API key secret
         env:
-          KEY: ${{ secrets.GROQ_API_KEY }}
+          KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           if [ -z "$KEY" ]; then
-            echo "::error::Secret 'groq_api_key' missing. Repo Settings → Secrets → groq_api_key"
+            echo "::error::Secret 'GOOGLE_API_KEY' missing. Repo Settings → Secrets → groq_api_key"
             exit 1
           fi
-          echo "Secret groq_api_key OK (length ${#KEY})."
+          echo "Secret google_api_key OK (length ${#KEY})."
 
       - name: Welcome ntfy (optional)
         continue-on-error: true
@@ -115,10 +115,10 @@ jobs:
       - name: Run Jarvis
         id: jarvis
         env:
-          groq_api_key: ${{ secrets.GROQ_API_KEY}}
+          groq_api_key: ${{ secrets.GOOGLE_API_KEY}}
           
-          GROQ_MODEL: ${{ vars.GROQ_MODEL || 'openai/gpt-oss-120b' }}
-          GROQ_BASE_URL: https://api.groq.com/openai/v1
+          GROQ_MODEL: ${{ vars.MY_MODEL || 'openai/gpt-oss-120b' }}
+          GROQ_BASE_URL: vars.BASE_URL
           JARVIS_VERBOSE: "true"
           JARVIS_MAX_ITER: "8"
           PYTHONPATH: ${{ github.workspace }}/src
