@@ -1,4 +1,4 @@
-"""Jarvis configuration — reads Google API key and runtime overrides from environment."""
+"""Jarvis configuration — GitHub Actions / Google API compatible."""
 
 from **future** import annotations
 
@@ -17,7 +17,9 @@ ROOT = Path(**file**).resolve().parents[2]
 
 # Load local .env if available.
 
-# GitHub Actions environment variables override these values.
+# GitHub Actions environment variables are already
+
+# injected into the process and will be used directly.
 
 load_dotenv(ROOT / ".env")
 
@@ -27,10 +29,7 @@ load_dotenv(ROOT / ".env")
 
 # ─────────────────────────────────────────────
 
-API_KEY = (
-os.getenv("GOOGLE_API_KEY")
-or ""
-)
+API_KEY = os.getenv("GOOGLE_API_KEY", "").strip()
 
 # ─────────────────────────────────────────────
 
@@ -41,7 +40,7 @@ or ""
 MODEL = (
 os.getenv("MY_MODEL")
 or "gemini-flash-latest"
-)
+).strip()
 
 # ─────────────────────────────────────────────
 
@@ -52,7 +51,7 @@ or "gemini-flash-latest"
 BASE_URL = (
 os.getenv("BASE_URL")
 or "https://generativelanguage.googleapis.com/v1beta"
-)
+).strip()
 
 # ─────────────────────────────────────────────
 
@@ -64,18 +63,18 @@ try:
 TEMPERATURE = float(
 os.getenv("JARVIS_TEMPERATURE", "0.3")
 )
-except ValueError:
+except (TypeError, ValueError):
 TEMPERATURE = 0.3
 
 try:
 MAX_ITER = int(
 os.getenv("JARVIS_MAX_ITER", "8")
 )
-except ValueError:
+except (TypeError, ValueError):
 MAX_ITER = 8
 
 VERBOSE = (
-os.getenv("JARVIS_VERBOSE", "true").lower()
+os.getenv("JARVIS_VERBOSE", "true").strip().lower()
 in {"1", "true", "yes", "on"}
 )
 
@@ -106,20 +105,15 @@ exist_ok=True,
 # ─────────────────────────────────────────────
 
 def require_api_key() -> str:
-"""
-Return the configured Google API key.
+"""Return the configured Google API key."""
 
 ```
-The key is expected from the GitHub Actions
-secret GOOGLE_API_KEY or local .env.
-"""
-
 if not API_KEY:
     raise RuntimeError(
-        "Missing API key.\n\n"
-        "Set GitHub Actions secret 'GOOGLE_API_KEY' "
-        "or define GOOGLE_API_KEY in .env.\n"
-        "Example: GOOGLE_API_KEY=AIzaSy..."
+        "Missing API key. Set GitHub secret "
+        "'GOOGLE_API_KEY' or environment variable "
+        'GOOGLE_API_KEY.\n'
+        "Example: GOOGLE_API_KEY=AIzaSyxxxxxxxx"
     )
 
 return API_KEY
