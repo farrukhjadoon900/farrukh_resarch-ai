@@ -3,11 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-
-_ROOT = Path(__file__).resolve().parents[2]
-if str(_ROOT / "src") not in sys.path:
-    sys.path.insert(0, str(_ROOT / "src"))
-
+import https
 from rich.console import Console
 from rich.markdown import Markdown
 from rich.panel import Panel
