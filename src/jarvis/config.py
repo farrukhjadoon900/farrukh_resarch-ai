@@ -107,7 +107,7 @@ exist_ok=True,
 def require_api_key() -> str:
 """Return the configured Google API key."""
 
-```
+
 if not API_KEY:
     raise RuntimeError(
         "Missing API key. Set GitHub secret "
