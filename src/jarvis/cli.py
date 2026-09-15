@@ -1,6 +1,6 @@
 """Jarvis CLI — talk to your multi-agent assistant."""
 
-from **future** import annotations
+from __future__ import annotations
 
 import argparse
 import sys
