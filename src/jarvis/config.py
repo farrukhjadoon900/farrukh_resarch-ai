@@ -1,6 +1,6 @@
 """Jarvis configuration — GitHub Actions / Google API compatible."""
 
-from **future** import annotations
+from __future__ import annotations
 
 import os
 from pathlib import Path
